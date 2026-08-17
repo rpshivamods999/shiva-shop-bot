@@ -18,13 +18,21 @@ import common_handlers as ch
 import fampay_utils as fp
 import binance_utils as bu
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# ---------------------------------------------------------------------------
+# Logging Configuration
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO, 
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Background Maintenance & Automated Backup Tasks
+# ---------------------------------------------------------------------------
 async def daily_backup(context: ContextTypes.DEFAULT_TYPE):
-    """Sends shop_bot.db to every admin once a day, so a wiped/redeployed host never
-    means losing all users, orders, deposits, balances and stock keys again."""
+    """Sends database backup to all admins once every 24 hours."""
     if not os.path.exists(DB_PATH):
         return
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
@@ -32,41 +40,49 @@ async def daily_backup(context: ContextTypes.DEFAULT_TYPE):
         try:
             with open(DB_PATH, "rb") as f:
                 await context.bot.send_document(
-                    admin_id, document=f, filename=f"shop_bot_backup_{timestamp}.db",
+                    admin_id, 
+                    document=f, 
+                    filename=f"shop_bot_backup_{timestamp}.db",
                     caption=f"💾 <b>Daily Automatic Backup</b>\n🕐 {timestamp}",
-                    parse_mode="HTML")
+                    parse_mode="HTML"
+                )
         except Exception as e:
             logger.error("daily_backup: failed to send to admin %s: %s", admin_id, e)
 
 
 async def maintenance_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Runs before every other handler (group=-1). When maintenance mode is ON,
-    silently lets admins through but blocks everyone else with a short notice,
-    then stops the update from reaching any normal handler."""
+    """Intercepts all updates when Maintenance Mode is enabled (group=-1)."""
     if not db.is_maintenance_mode():
         return
 
     user = update.effective_user
     if user and db.is_admin(user.id):
-        return  # admins bypass maintenance mode completely
+        return  # Admins bypass maintenance gate
 
     if update.callback_query:
         try:
             await update.callback_query.answer(
-                "🚧 Bot is under maintenance. Please check back soon!", show_alert=True)
+                "🚧 Bot is under maintenance. Please check back soon!", show_alert=True
+            )
         except Exception:
             pass
     elif update.message:
         try:
             await update.message.reply_text(
                 "🚧 <b>Bot is under maintenance</b>\n\n"
-                "We're currently making some improvements. Please check back in a little while "
+                "We are currently making improvements. Please check back in a little while "
                 "— sorry for the inconvenience!",
-                parse_mode="HTML")
+                parse_mode="HTML"
+            )
         except Exception:
             pass
 
-    raise ApplicationHandlerStop()  # prevent the update from reaching group 0 handlers
+    raise ApplicationHandlerStop()
+
+
+# ---------------------------------------------------------------------------
+# Router Handlers
+# ---------------------------------------------------------------------------
 async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = update.callback_query.data or ""
     if data.startswith("adm_"):
@@ -99,8 +115,11 @@ async def cleanup_stale_transactions(context: ContextTypes.DEFAULT_TYPE):
             pass
 
 
+# ---------------------------------------------------------------------------
+# Automated Payment Polling Loops
+# ---------------------------------------------------------------------------
 async def poll_upi_deposits(context: ContextTypes.DEFAULT_TYPE):
-    """Auto-verifies FamPay-backed UPI deposits AND product orders in the background."""
+    """Auto-verifies FamPay-backed UPI deposits and orders in the background."""
     for dep in db.list_pending_gateway_deposits():
         try:
             status, raw = fp.verify_order(dep["gateway_order_id"])
@@ -116,6 +135,7 @@ async def poll_upi_deposits(context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
             continue
+
         if status == "success":
             db.set_deposit_status(dep["id"], "completed")
             if dep.get("purpose") == "reseller_upgrade":
@@ -130,7 +150,8 @@ async def poll_upi_deposits(context: ContextTypes.DEFAULT_TYPE):
                         dep["telegram_id"],
                         kb.get_header("deposit_confirmed_message", amount=dep["amount"],
                                       previous_balance=previous_balance, new_balance=previous_balance + dep["amount"]),
-                        parse_mode="HTML")
+                        parse_mode="HTML"
+                    )
                 except Exception:
                     pass
                 await ch.notify_admins_deposit_completed(context, dep["id"], "UPI (Auto-Verified)")
@@ -156,6 +177,7 @@ async def poll_upi_deposits(context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
             continue
+
         if status == "success":
             await uh.deliver_order_key(context, o["id"], o)
         elif status in ("failed", "expired"):
@@ -168,7 +190,7 @@ async def poll_upi_deposits(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def poll_binance_payments(context: ContextTypes.DEFAULT_TYPE):
-    """Naya background automatic verification process normal/personal Binance accounts ke liye."""
+    """Background automatic verification for Binance payments."""
     try:
         with db.get_conn() as conn:
             review_orders = conn.execute(
@@ -201,26 +223,26 @@ async def poll_binance_payments(context: ContextTypes.DEFAULT_TYPE):
                             tid,
                             kb.get_header("deposit_confirmed_message", amount=rd["amount"],
                                           previous_balance=previous_balance, new_balance=previous_balance + rd["amount"]),
-                            parse_mode="HTML")
-                    except:
-                        pass
+                            parse_mode="HTML"
+                        )
+                    except Exception as e:
+                        logger.error("Failed to notify user about binance deposit: %s", e)
                     await ch.notify_admins_deposit_completed(context, rd["id"], "Binance (Auto-Verified)")
     except Exception as e:
         logger.error("poll_binance_payments crashed: %s", e)
+
+
+# ---------------------------------------------------------------------------
+# Fallback Async Task Scheduler
+# ---------------------------------------------------------------------------
 class _BotOnlyContext:
-    """Minimal stand-in for ContextTypes.DEFAULT_TYPE — cleanup_stale_transactions,
-    poll_upi_deposits and daily_backup only ever touch context.bot, so this is enough
-    to run them outside of JobQueue."""
+    """Minimal stand-in for ContextTypes.DEFAULT_TYPE when JobQueue is unavailable."""
     def __init__(self, bot):
         self.bot = bot
 
 
 async def _run_repeating_fallback(coro_func, ctx, interval, first_delay):
-    """Fallback scheduler used when app.job_queue is unavailable (i.e. the
-    'python-telegram-bot[job-queue]' extra isn't installed). Without this, QR/UPI
-    payments would show 'expires in 5 minutes' but NEVER actually get cancelled or
-    receive the expiry message, since that only happens inside cleanup_stale_transactions
-    which normally runs via JobQueue."""
+    """Fallback scheduler used when app.job_queue is not installed."""
     await asyncio.sleep(first_delay)
     while True:
         try:
@@ -231,18 +253,19 @@ async def _run_repeating_fallback(coro_func, ctx, interval, first_delay):
 
 
 async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """Catches anything that slips past every handler's own try/except, so a bug
-    shows up in logs (and pings admins) instead of the user just seeing nothing."""
+    """Global error handler for catching unhandled exceptions."""
     logger.error("Unhandled exception while processing update: %s", update, exc_info=context.error)
-    from config import ADMIN_IDS as _ADMIN_IDS
     err_text = f"⚠️ Bot error: {type(context.error).__name__}: {context.error}"[:500]
-    for admin_id in _ADMIN_IDS:
+    for admin_id in ADMIN_IDS:
         try:
             await context.bot.send_message(admin_id, err_text)
         except Exception:
             pass
 
 
+# ---------------------------------------------------------------------------
+# Main Application Setup
+# ---------------------------------------------------------------------------
 def main():
     try:
         asyncio.get_event_loop()
@@ -260,10 +283,11 @@ def main():
         .build()
     )
 
-    # group=-1 runs BEFORE all handlers below, so maintenance mode can block them.
+    # Priority Gate (group=-1)
     app.add_handler(MessageHandler(filters.ALL, maintenance_gate), group=-1)
     app.add_handler(CallbackQueryHandler(maintenance_gate), group=-1)
 
+    # Command Handlers
     app.add_handler(CommandHandler("start", uh.start))
     app.add_handler(CommandHandler("admin", ah.admin_entry))
     app.add_handler(CommandHandler("stock", ah.stock_report))
@@ -278,6 +302,7 @@ def main():
     app.add_handler(CommandHandler("premium", ah.premium_cmd))
     app.add_handler(CommandHandler("basic", ah.basic_cmd))
 
+    # General Handlers
     app.add_handler(CallbackQueryHandler(route_callback))
     app.add_error_handler(global_error_handler)
 
@@ -287,6 +312,7 @@ def main():
         filters.VIDEO | filters.VOICE | filters.Document.ALL | filters.AUDIO, ch.handle_other_media))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_text))
 
+    # Job Queue or Fallback Scheduler
     if app.job_queue is not None:
         app.job_queue.run_repeating(cleanup_stale_transactions, interval=60, first=30)
         app.job_queue.run_repeating(poll_upi_deposits, interval=15, first=10)
@@ -294,8 +320,7 @@ def main():
         app.job_queue.run_repeating(daily_backup, interval=24 * 60 * 60, first=60)
     else:
         logger.warning(
-            "JobQueue not available (install with: pip install \"python-telegram-bot[job-queue]\") "
-            "— falling back to a manual asyncio scheduler so QR expiry / auto-verify still work."
+            "JobQueue not available. Falling back to asyncio manual task scheduler."
         )
 
         async def _start_fallback_jobs(application):
@@ -307,7 +332,7 @@ def main():
 
         app.post_init = _start_fallback_jobs
 
-    logger.info("Bot starting...")
+    logger.info("Bot starting successfully...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
