@@ -1,12 +1,9 @@
 import os
 
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8551075183:AAF0RlWWCeD0PnX19bzHPiShuDA_37OPTvk")
+BOT_TOKEN = os.environ.get("8802969772:AAE-SuorCHBkmK3AbxKNkdgw3yPS9eyI_o4")
 
-ADMIN_IDS = [
-    8357256746,
-    7521404290
-]
+ADMIN_IDS = [6419247159]
 
 SUPPORT_ADMIN_USERNAME = "your_admin_username"
 
