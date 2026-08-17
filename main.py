@@ -13,14 +13,14 @@ import json
 import difflib
 from telebot import types
 
-# RG CHEAT SHOP — feature-preserving UI/emoji/price-list update
+# TEST BOT SHOP — feature-preserving UI/emoji/price-list update
 # Version: 2026-08-15 — FINAL v6 PREMIUM TEMPLATE + API/STOCK/PRICE FIX
 
 # Telegram Bot API Token
-TOKEN = '8193205734:AAGn8VrIwjD-eEWRRHG9JHcOBv03pUaRVYA'
+TOKEN = '8802969772:AAEJlruYDsrrlbvLD4yyWMJgDVk37MphqZM'
 
 # Telegram Numeric Admin ID (Supports multiple admins if needed)
-ADMIN_IDS = [8781522303, 6739795427]  
+ADMIN_IDS = [6419247159,6739795427]  
 
 # --- FAMGATEWAY API CONFIGURATION ---
 FAM_API_KEY = 'FAM_82B6FA7808EB1F97DFD0789B63EA50BE40C1C9AA'
