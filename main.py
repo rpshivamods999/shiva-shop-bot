@@ -1,174 +1,161 @@
 import os
-import sqlite3
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    MessageHandler, filters, ContextTypes, ConversationHandler
 )
 
-# লগিং সেটআপ
-logging.basicConfig(level=logging.INFO)
+# Logging Setup
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# এনভায়রনমেন্ট ভ্যারিয়েবল থেকে টোকেন ও অ্যাডমিন আইডি সংগ্রহ
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))
+# Environment Variables
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
-# ডাটাবেস প্রস্তুত করা
-conn = sqlite3.connect('shop.db', check_same_thread=False)
-cursor = conn.cursor()
+# States for Adding Product & Key
+ADD_NAME, ADD_PRICE, ADD_DESC, ADD_KEY_PROD, ADD_KEY_VAL = range(5)
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE,
-    status INTEGER DEFAULT 1
-)''')
+# In-Memory Database
+PRODUCTS = {}  # {prod_id: {"name": str, "price": str, "desc": str, "keys": []}}
+product_counter = 1
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS keys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_name TEXT,
-    key_code TEXT UNIQUE,
-    status TEXT DEFAULT 'available'
-)''')
-conn.commit()
-
-# /admin কমান্ড
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Commands
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        if update.message:
-            await update.message.reply_text("⛔ আপনি এই প্যানেল ব্যবহারের অনুমতিপ্রাপ্ত নন।")
-        return
-
+    text = "🔥 **WELCOME TO RP SHIVA LIVE SHOP** 🔥\n\nChoose an option from below:"
     keyboard = [
-        [InlineKeyboardButton("🛍️ Products", callback_data="admin_products"), InlineKeyboardButton("🔑 Keys", callback_data="admin_keys")],
-        [InlineKeyboardButton("➕ Add Product", callback_data="add_product")],
-        [InlineKeyboardButton("❌ Close", callback_data="close_panel")]
+        [InlineKeyboardButton("🛒 Browse Products", callback_data="user_products")],
+        [InlineKeyboardButton("💳 Payment Methods", callback_data="user_payment")],
+        [InlineKeyboardButton("👨‍💻 Official Support", callback_data="user_support")]
     ]
+    if user_id == ADMIN_ID:
+        keyboard.append([InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")])
+        
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    text = (
-        "🤖 **Rp Shiva Shop Admin Control Panel**\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "ধাপ ১ টেস্ট ভার্সনে স্বাগতম! নিচে থেকে যেকোনো অপশন বেছে নিন।"
-    )
-    
     if update.message:
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
-# ইনলাইন বাটন হ্যান্ডলার
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    if query.data == "admin_main":
-        await admin_panel(update, context)
-        
-    elif query.data == "admin_products":
-        cursor.execute("SELECT id, name, status FROM products")
-        prods = cursor.fetchall()
-        
-        keyboard = []
-        for p_id, p_name, p_status in prods:
-            status_icon = "✅" if p_status == 1 else "🚫"
-            keyboard.append([InlineKeyboardButton(f"{status_icon} {p_name}", callback_data=f"toggle_prod_{p_id}")])
-            
-        keyboard.append([InlineKeyboardButton("➕ Add Product", callback_data="add_product")])
-        keyboard.append([InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_main")])
-        
-        await query.edit_message_text("🛍️ **PRODUCTS MANAGEMENT**\n\nপণ্য অন/অফ করতে নামের ওপর ট্যাপ করুন:", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data.startswith("toggle_prod_"):
-        p_id = int(query.data.split("_")[2])
-        cursor.execute("UPDATE products SET status = CASE WHEN status = 1 THEN 0 ELSE 1 END WHERE id = ?", (p_id,))
-        conn.commit()
-        # রিফ্রেশ প্রোডাক্ট লিস্ট
-        await button_handler(update, context)
-
-    elif query.data == "add_product":
-        context.user_data['state'] = 'WAITING_FOR_PRODUCT_NAME'
-        await query.edit_message_text("📝 নতুন প্রোডাক্টের নাম লিখে মেসেজ পাঠান:")
-
-    elif query.data == "admin_keys":
-        cursor.execute("SELECT COUNT(*) FROM keys")
-        total = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM keys WHERE status='available'")
-        available = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM keys WHERE status='sold'")
-        sold = cursor.fetchone()[0]
-        
-        keyboard = [
-            [InlineKeyboardButton("📩 Upload Keys", callback_data="upload_keys")],
-            [InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_main")]
-        ]
-        text = f"🔑 **KEYS STATS**\n━━━━━━━\n├ 🔢 Total: {total}\n├ ✅ Available: {available}\n└ 💰 Sold: {sold}"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data == "upload_keys":
-        cursor.execute("SELECT name FROM products WHERE status=1")
-        prods = cursor.fetchall()
-        if not prods:
-            await query.edit_message_text("❌ কোনো একটিভ প্রোডাক্ট নেই! আগে প্রোডাক্ট যোগ করুন।", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_keys")]]))
-            return
-        
-        keyboard = []
-        for (p_name,) in prods:
-            keyboard.append([InlineKeyboardButton(f"🛒 {p_name}", callback_data=f"sel_prod_key_{p_name}")])
-        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="admin_keys")])
-        
-        await query.edit_message_text("🔑 কোন প্রোডাক্টের জন্য লাইসেন্স কী (Key) আপলোড করতে চান সিলেক্ট করুন:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data.startswith("sel_prod_key_"):
-        p_name = query.data.replace("sel_prod_key_", "")
-        context.user_data['state'] = 'WAITING_FOR_KEYS'
-        context.user_data['target_product'] = p_name
-        await query.edit_message_text(f"📥 **{p_name}**-এর জন্য কী (Key) গুলো মেসেজে পাঠান।\n(একাধিক কী একসাথে পাঠাতে প্রতি লাইনে ১টি করে দিন):")
-
-    elif query.data == "close_panel":
-        await query.delete_message()
-
-# টেক্সট মেসেজ প্রসেসর (প্রোডাক্ট বা কী ইনপুটের জন্য)
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
+    if query.from_user.id != ADMIN_ID:
+        await query.edit_message_text("❌ Unauthorized Access!")
         return
 
-    state = context.user_data.get('state')
-    
-    if state == 'WAITING_FOR_PRODUCT_NAME':
-        prod_name = update.message.text.strip()
-        try:
-            cursor.execute("INSERT INTO products (name) VALUES (?)", (prod_name,))
-            conn.commit()
-            await update.message.reply_text(f"✅ প্রোডাক্ট **{prod_name}** সফলভাবে যুক্ত হয়েছে!", parse_mode="Markdown")
-        except sqlite3.IntegrityError:
-            await update.message.reply_text("❌ এই নামের প্রোডাক্ট আগে থেকেই আছে!")
-        context.user_data['state'] = None
+    text = "🤖 **RP SHIVA LIVE SHOP - ADMIN PANEL**\n\nSelect an operation:"
+    keyboard = [
+        [InlineKeyboardButton("🛍️ Products", callback_data="list_products_admin"), InlineKeyboardButton("🔑 Stock Keys", callback_data="manage_keys")],
+        [InlineKeyboardButton("➕ Add Product", callback_data="start_add_prod"), InlineKeyboardButton("➕ Add License/Key", callback_data="start_add_key")],
+        [InlineKeyboardButton("❌ Close Panel", callback_data="close_menu")]
+    ]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-    elif state == 'WAITING_FOR_KEYS':
-        raw_keys = update.message.text.strip().split('\n')
-        p_name = context.user_data.get('target_product')
-        
-        count = 0
-        for k in raw_keys:
-            key_code = k.strip()
-            if key_code:
-                try:
-                    cursor.execute("INSERT INTO keys (product_name, key_code) VALUES (?, ?)", (p_name, key_code))
-                    count += 1
-                except sqlite3.IntegrityError:
-                    pass
-        conn.commit()
-        await update.message.reply_text(f"✅ **{p_name}**-এর জন্য মোট **{count}** টি নতুন কী (Key) সফলভাবে আপলোড হয়েছে!", parse_mode="Markdown")
-        context.user_data['state'] = None
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+    await query.answer()
+
+    if data == "admin_panel":
+        await admin_panel(update, context)
+    elif data == "close_menu":
+        await query.delete_message()
+    elif data == "user_payment":
+        text = "💳 **Payment Methods & Info**\n\n• **Bkash / Nagad / Upay:** Contact Admin\n• **UPI / QR Code:** Contact Admin\n\nAfter payment, send receipt screenshot to admin."
+        keyboard = [[InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    elif data == "user_support":
+        text = "👨‍💻 **Official Customer Support**\n\nFor queries, payments, or manual support contact admin."
+        keyboard = [[InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    elif data == "main_menu":
+        await start(update, context)
+    elif data == "user_products":
+        if not PRODUCTS:
+            text = "❌ Currently no products are available in the shop."
+            keyboard = [[InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")]]
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        keyboard = []
+        for p_id, item in PRODUCTS.items():
+            stock = len(item["keys"])
+            keyboard.append([InlineKeyboardButton(f"📦 {item['name']} | ₹{item['price']} (Stock: {stock})", callback_data=f"buy_{p_id}")])
+        keyboard.append([InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")])
+        await query.edit_message_text("🛍️ **Select a Product to Buy:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    elif data.startswith("buy_"):
+        p_id = int(data.split("_")[1])
+        item = PRODUCTS.get(p_id)
+        if item:
+            stock = len(item["keys"])
+            text = f"📦 **Product:** {item['name']}\n💰 **Price:** ₹{item['price']}\n📊 **Stock:** {stock}\n\n📝 **Description:**\n{item['desc']}\n\nTo purchase, complete payment and contact Admin."
+            keyboard = [[InlineKeyboardButton("🔙 Back to Shop", callback_data="user_products")]]
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    elif data == "list_products_admin":
+        if not PRODUCTS:
+            text = "❌ No products found."
+        else:
+            text = "📋 **Product List:**\n\n"
+            for p_id, item in PRODUCTS.items():
+                text += f"• **ID {p_id}:** {item['name']} | ₹{item['price']} | Keys left: {len(item['keys'])}\n"
+        keyboard = [[InlineKeyboardButton("🔙 Admin Panel", callback_data="admin_panel")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+# Conversation Handlers for Adding Product
+async def start_add_prod(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📝 **Step 1/3:** Enter the **Product Name**:")
+    return ADD_NAME
+
+async def add_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['prod_name'] = update.message.text
+    await update.message.reply_text("💵 **Step 2/3:** Enter the **Product Price**:")
+    return ADD_PRICE
+
+async def add_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['prod_price'] = update.message.text
+    await update.message.reply_text("📋 **Step 3/3:** Enter the **Product Description**:")
+    return ADD_DESC
+
+async def add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global product_counter
+    context.user_data['prod_desc'] = update.message.text
+    
+    PRODUCTS[product_counter] = {
+        "name": context.user_data['prod_name'],
+        "price": context.user_data['prod_price'],
+        "desc": context.user_data['prod_desc'],
+        "keys": []
+    }
+    await update.message.reply_text(f"✅ Product **{context.user_data['prod_name']}** added successfully with ID #{product_counter}!\n\nUse /admin to return to panel.")
+    product_counter += 1
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ Operation cancelled. Use /admin to open panel.")
+    return ConversationHandler.END
+
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    prod_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_add_prod, pattern="^start_add_prod$")],
+        states={
+            ADD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_name)],
+            ADD_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_price)],
+            ADD_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_desc)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel)]
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(prod_conv)
+    app.add_handler(CallbackQueryHandler(callback_handler))
+
+    app.run_polling()
 
 if __name__ == '__main__':
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("admin", admin_panel))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    print("Bot is starting...")
-    app.run_polling()
+    main()
