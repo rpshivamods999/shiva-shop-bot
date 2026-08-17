@@ -22,7 +22,7 @@ import binance_utils as bu
 # Logging Configuration
 # ---------------------------------------------------------------------------
 logging.basicConfig(
-    level=logging.INFO, 
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -267,12 +267,12 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
 # Main Application Setup
 # ---------------------------------------------------------------------------
 def main():
-    try:
-        asyncio.get_event_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+    # Fix for Python 3.13 asyncio event loop issue
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     db.init_db()
+    
     app = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -319,9 +319,7 @@ def main():
         app.job_queue.run_repeating(poll_binance_payments, interval=15, first=12)
         app.job_queue.run_repeating(daily_backup, interval=24 * 60 * 60, first=60)
     else:
-        logger.warning(
-            "JobQueue not available. Falling back to asyncio manual task scheduler."
-        )
+        logger.warning("JobQueue not available. Falling back to asyncio manual task scheduler.")
 
         async def _start_fallback_jobs(application):
             ctx = _BotOnlyContext(application.bot)
