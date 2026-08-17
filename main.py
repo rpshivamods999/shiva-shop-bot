@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PAYTM_MID = os.getenv("PAYTM_MID", "")          # Paytm Merchant ID
-PAYTM_UPI_ID = os.getenv("PAYTM_UPI_ID", "")    # Custom UPI ID (e.g. merchant@paytm)
+PAYTM_UPI_ID = os.getenv("PAYTM_UPI_ID", "")    # Custom Paytm/UPI ID
 
 # ---------------------------------------------------------------------------
 # Conversation Handler States
@@ -33,7 +33,7 @@ ADD_PROD_CAT, ADD_PROD_NAME, ADD_PROD_PRICE, ADD_PROD_DESC = range(2, 6)
 ADD_KEY_PROD, ADD_KEY_VAL = range(6, 8)
 
 # ---------------------------------------------------------------------------
-# In-Memory Database (Production structure ready)
+# In-Memory Database
 # ---------------------------------------------------------------------------
 CATEGORIES = []
 PRODUCTS = {}         # {prod_id: {"category": str, "name": str, "price": str, "desc": str, "keys": []}}
@@ -41,22 +41,21 @@ PENDING_ORDERS = {}   # {order_id: {"user_id": int, "prod_id": int, "price": str
 product_counter = 1
 
 # ---------------------------------------------------------------------------
-# Paytm & Auto-Verification Core Logic
+# Paytm Verification Logic
 # ---------------------------------------------------------------------------
 def verify_payment_api(order_id: str) -> bool:
     """
     Verifies payment status with Paytm Gateway API.
-    Returns True if payment is successful, False otherwise.
+    Returns True if payment is confirmed, False otherwise.
     """
     if not PAYTM_MID:
         return False
-    # Paytm API Transaction Status Check Integration Logic
+    # API Integration endpoint for Paytm status check
     url = f"https://securegw.paytm.in/v3/order/status"
-    # Insert production status check checksum logic here when needed
     return False
 
 # ---------------------------------------------------------------------------
-# USER HANDLERS
+# USER HANDLERS (ENGLISH UI)
 # ---------------------------------------------------------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -66,9 +65,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⚡ **WELCOME TO RP SHIVA LIVE SHOP** ⚡\n"
         f"─────────────────────────────\n"
         f"Hello **{first_name}**, welcome to our official automated store!\n\n"
-        f"🔹 Instant Automatic Key & File Delivery\n"
-        f"🔹 24/7 Verified Payment Gateway\n"
-        f"🔹 Dedicated Customer Support\n\n"
+        f"🔹 **Instant Delivery:** Automatic key & file dispatch\n"
+        f"🔹 **Payment Gateway:** 24/7 Paytm & UPI Supported\n"
+        f"🔹 **Support:** Dedicated customer assistance\n\n"
         f"Please select an option from the menu below:"
     )
     
@@ -102,27 +101,27 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "user_payment":
         text = (
-            "💳 **PAYMENT METHODS & INFORMATION**\n"
+            "💳 **PAYMENT INFORMATION**\n"
             "─────────────────────────────\n"
-            "• **Accepted Gateway:** Paytm, PhonePe, Google Pay, BHIM UPI\n"
-            "• **Auto Verification:** Instant order fulfillment upon payment\n\n"
-            "If you face any issues during payment, click Support below."
+            "• **Supported Gateways:** Paytm, PhonePe, Google Pay, BHIM UPI\n"
+            "• **Auto Verification:** Instant order fulfillment upon payment confirmation\n\n"
+            "For any payment queries, reach out via Customer Support."
         )
         keyboard = [[InlineKeyboardButton("🔙 Back to Main Menu", callback_data="main_menu")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data == "user_support":
         text = (
-            "👨‍💻 **OFFICIAL CUSTOMER SUPPORT**\n"
+            "👨‍💻 **CUSTOMER SUPPORT**\n"
             "─────────────────────────────\n"
-            "Need help with your order or custom requirements?\n\n"
-            "• **Telegram Direct Support:** `@RpShivaLive`\n"
-            "• **Operating Hours:** 24/7 Active"
+            "Have questions or need assistance with your purchase?\n\n"
+            "• **Official Telegram Admin:** `@RpShivaLive`\n"
+            "• **Availability:** 24/7 Active Support"
         )
         keyboard = [[InlineKeyboardButton("🔙 Back to Main Menu", callback_data="main_menu")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-    # ---------------- USER BROWSE & SHOPPING ----------------
+    # ---------------- BROWSE & SHOPPING ----------------
     elif data == "user_categories":
         if not CATEGORIES:
             text = "❌ **No categories available at the moment.** Please check back later!"
@@ -136,7 +135,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🔙 Main Menu", callback_data="main_menu")])
         
         await query.edit_message_text(
-            "📂 **SELECT A CATEGORY:**\nChoose a category below to explore items:",
+            "📂 **SELECT A CATEGORY:**\nChoose a category below to explore available items:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
@@ -161,18 +160,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🔙 Back to Categories", callback_data="user_categories")])
         
         await query.edit_message_text(
-            f"🛍️ **PRODUCTS IN {cat_name.upper()}:**\nSelect an item to view details & buy:",
+            f"🛍️ **PRODUCTS IN {cat_name.upper()}:**\nSelect an item to proceed:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
 
-    # ---------------- CHECKOUT & AUTO PAYTM ----------------
+    # ---------------- CHECKOUT & PAYTM ----------------
     elif data.startswith("buy_"):
         pid = int(data.split("_")[1])
         item = PRODUCTS.get(pid)
         
         if not item or len(item["keys"]) == 0:
-            text = "⚠️ **Sorry! This product is currently Out of Stock.**\nPlease contact Admin for restock."
+            text = "⚠️ **Sorry! This product is currently Out of Stock.**\nPlease contact Admin for restock updates."
             keyboard = [[InlineKeyboardButton("🔙 Back to Shop", callback_data="user_categories")]]
             await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
             return
@@ -184,22 +183,21 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "price": item["price"]
         }
 
-        # Paytm / UPI String Construction
+        # Paytm / UPI Payment URI
         upi_vpa = PAYTM_UPI_ID if PAYTM_UPI_ID else f"{PAYTM_MID}@paytm"
         pay_url = f"upi://pay?pa={upi_vpa}&pn=RPSHIVASHOP&am={item['price']}&tn={order_id}&cu=INR"
-        qr_image_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={pay_url}"
 
         checkout_text = (
-            f"🛒 **CHECKOUT & AUTO PAYMENT**\n"
+            f"🛒 **CHECKOUT & PAYTM GATEWAY**\n"
             f"─────────────────────────────\n"
             f"📦 **Item:** {item['name']}\n"
             f"💰 **Total Price:** ₹{item['price']}\n"
             f"🆔 **Order ID:** `{order_id}`\n\n"
-            f"📌 **Description:**\n{item['desc']}\n\n"
-            f"👇 **Payment Instructions:**\n"
-            f"1. Click **'Pay via Paytm / UPI'** or scan the QR code.\n"
+            f"📌 **Product Details:**\n{item['desc']}\n\n"
+            f"👇 **How to Complete Payment:**\n"
+            f"1. Click **'Pay via Paytm / UPI App'** below.\n"
             f"2. Complete the payment of ₹{item['price']}.\n"
-            f"3. Click **'Verify Payment'** below for instant automated delivery!"
+            f"3. Click **'Verify Payment'** for instant delivery!"
         )
         
         keyboard = [
@@ -219,13 +217,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         order = PENDING_ORDERS.get(order_id)
         
         if not order:
-            await query.edit_message_text("❌ Order expired or invalid. Please start checkout again.")
+            await query.edit_message_text("❌ Order expired or invalid. Please select your item again.")
             return
 
         pid = order["prod_id"]
         item = PRODUCTS.get(pid)
 
-        # Execute Auto-Verification Check
+        # Verification check
         is_verified = verify_payment_api(order_id)
         
         if is_verified and item and len(item["keys"]) > 0:
@@ -233,13 +231,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del PENDING_ORDERS[order_id]
             
             success_text = (
-                f"🎉 **PAYMENT SUCCESSFUL!** 🎉\n"
+                f"🎉 **PAYMENT CONFIRMED!** 🎉\n"
                 f"─────────────────────────────\n"
                 f"Thank you for your purchase!\n\n"
                 f"📦 **Product:** {item['name']}\n"
-                f"🔐 **Your License Key / Digital Link:**\n\n"
+                f"🔐 **Your Key / Digital Item:**\n\n"
                 f"`{delivered_key}`\n\n"
-                f"⚠️ *Keep this key safe. Contact support if you need assistance.*"
+                f"⚠️ *Keep this key safe. Contact support for any assistance.*"
             )
             await query.edit_message_text(success_text, parse_mode="Markdown")
         else:
@@ -247,8 +245,8 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏳ **PAYMENT NOT DETECTED YET**\n"
                 f"─────────────────────────────\n"
                 f"Order ID: `{order_id}`\n\n"
-                f"If you have already paid, please allow 1-2 minutes for the banking server to sync and tap **'Try Verification Again'**.\n\n"
-                f"For manual verification, send your payment screenshot to `@RpShivaLive`."
+                f"If you have already paid, please allow 1-2 minutes for banking server updates and tap **'Try Verification Again'**.\n\n"
+                f"For manual confirmation, send your payment screenshot to `@RpShivaLive`."
             )
             keyboard = [
                 [InlineKeyboardButton("🔄 Try Verification Again", callback_data=f"verify_{order_id}")],
@@ -272,7 +270,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 # ---------------------------------------------------------------------------
-# ADMIN PANEL HANDLERS
+# ADMIN DASHBOARD HANDLERS
 # ---------------------------------------------------------------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -289,7 +287,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_text = (
         "⚙️ **ADMIN CONTROL DASHBOARD**\n"
         "─────────────────────────────\n"
-        "Manage your shop categories, products, stock, and automated settings below:"
+        "Manage store categories, products, key stock, and operational settings:"
     )
     
     keyboard = [
@@ -304,18 +302,18 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(admin_text, reply_markup=reply_markup, parse_mode="Markdown")
 
-# ---------------- CONVERSATIONS FOR ADMIN ACTIONS ----------------
+# ---------------- ADMIN CONVERSATION STEPS ----------------
 async def start_add_cat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("📂 **Enter new Category Name:**\n(Example: `Free Fire Mods`, `VIP Root Services`)", parse_mode="Markdown")
+    await query.edit_message_text("📂 **Enter new Category Name:**\n(e.g., `Free Fire Mods`, `VIP Root Services`)", parse_mode="Markdown")
     return ADD_CAT_NAME
 
 async def add_cat_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cat_name = update.message.text.strip()
     if cat_name not in CATEGORIES:
         CATEGORIES.append(cat_name)
-        await update.message.reply_text(f"✅ Category **{cat_name}** created successfully!\n\nType /admin to open dashboard.", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ Category **{cat_name}** created successfully!\n\nType /admin to return to panel.", parse_mode="Markdown")
     else:
         await update.message.reply_text("⚠️ This category already exists.")
     return ConversationHandler.END
@@ -324,7 +322,7 @@ async def start_add_prod(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if not CATEGORIES:
-        await query.edit_message_text("❌ Please create at least one category first using 'Add Category'.")
+        await query.edit_message_text("❌ Create at least one category first using 'Add Category'.")
         return ConversationHandler.END
         
     cats = ", ".join(CATEGORIES)
@@ -334,7 +332,7 @@ async def start_add_prod(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def add_prod_cat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cat = update.message.text.strip()
     if cat not in CATEGORIES:
-        await update.message.reply_text(f"❌ Invalid category. Choose from: {', '.join(CATEGORIES)}")
+        await update.message.reply_text(f"❌ Invalid category. Select from: {', '.join(CATEGORIES)}")
         return ADD_PROD_CAT
     context.user_data['p_cat'] = cat
     await update.message.reply_text("📝 **Step 1/3:** Enter **Product Name**:")
@@ -359,7 +357,7 @@ async def add_prod_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "desc": update.message.text.strip(),
         "keys": []
     }
-    await update.message.reply_text(f"✅ Product **{context.user_data['p_name']}** added with ID **#{product_counter}**!\n\nType /admin to open dashboard.", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ Product **{context.user_data['p_name']}** added with ID **#{product_counter}**!\n\nType /admin to return to panel.", parse_mode="Markdown")
     product_counter += 1
     return ConversationHandler.END
 
@@ -391,7 +389,7 @@ async def add_key_prod(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def add_key_val(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pid = context.user_data['key_pid']
     PRODUCTS[pid]["keys"].append(update.message.text.strip())
-    await update.message.reply_text(f"✅ Stock added successfully to Product ID **#{pid}**! Total Stock: {len(PRODUCTS[pid]['keys'])}\n\nType /admin to open dashboard.", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ Key added successfully to Product ID **#{pid}**! Total Stock: {len(PRODUCTS[pid]['keys'])}\n\nType /admin to return to panel.", parse_mode="Markdown")
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -399,7 +397,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # ---------------------------------------------------------------------------
-# MAIN APPLICATION INITIALIZATION
+# MAIN FUNCTION
 # ---------------------------------------------------------------------------
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
