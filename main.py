@@ -267,10 +267,6 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
 # Main Application Setup
 # ---------------------------------------------------------------------------
 def main():
-    # Fix for Python 3.13 asyncio event loop issue
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
     db.init_db()
     
     app = (
