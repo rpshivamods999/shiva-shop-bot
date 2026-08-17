@@ -269,9 +269,14 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
 def main():
     db.init_db()
     
+    token = BOT_TOKEN.strip() if BOT_TOKEN else ""
+    if not token:
+        logger.error("BOT_TOKEN is missing or empty! Please set BOT_TOKEN in environment variables or config.py")
+        return
+
     app = (
         Application.builder()
-        .token(BOT_TOKEN)
+        .token(token)
         .connect_timeout(30)
         .read_timeout(30)
         .write_timeout(30)
