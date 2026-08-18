@@ -29,10 +29,10 @@ import numpy as np
 # Version: 2026-08-18 — Add Balance UI/keypad/live-balance fix; existing checkout logic preserved
 
 # Telegram Bot API Token
-TOKEN = '8839947716:AAEWF9a3uymFB6LOFfVXzSK8k6dXoqN61qM'
+TOKEN = '8802969772:AAEJlruYDsrrlbvLD4yyWMJgDVk37MphqZM'
 
 # Telegram Numeric Admin ID (Supports multiple admins if needed)
-ADMIN_IDS = [8781522303, 6739795427]  
+ADMIN_IDS = [6739795427,6419247159]  
 
 # --- FAMGATEWAY API CONFIGURATION ---
 FAM_API_KEY = 'FAM_82B6FA7808EB1F97DFD0789B63EA50BE40C1C9AA'
