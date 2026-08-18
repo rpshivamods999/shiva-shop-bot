@@ -25,25 +25,20 @@ from PIL import Image, ImageDraw
 import cv2
 import numpy as np
 
-# RG CHEAT SHOP — feature-preserving UI/emoji/price-list update
+# RP TEST SHOP — feature-preserving UI/emoji/price-list update
 # Version: 2026-08-18 — Add Balance UI/keypad/live-balance fix; existing checkout logic preserved
 # ID input safety patch: Telegram commands can no longer be saved as Product/Valid IDs.
 
 # Telegram Bot API Token
-TOKEN = '8941581162:AAGONNennZ8xDBTs8AO_eyO2sZ_H7nb9NWM'
+TOKEN = '8802969772:AAGf3O-ufGto5H3QyUPaQhdNMjIjR0dT0yY'
 
 # Telegram Numeric Admin ID (Supports multiple admins if needed)
-ADMIN_IDS = [8781522303, 6739795427]  
+ADMIN_IDS = [6419247159]  
 
 # --- FAMGATEWAY API CONFIGURATION ---
 FAM_API_KEY = 'FAM_82B6FA7808EB1F97DFD0789B63EA50BE40C1C9AA'
 BASE_GATEWAY_URL = 'https://fampaygateway.site/api'
 RECEIVER_UPI = '8158833153@fam'
-
-# --- EXACT RESELLER API CONFIGURATION (PHP CONVERTED) ---
-RESELLER_API_URL = 'https://xyzcheats.com/api/reseller_v1.php'
-RESELLER_API_KEY = '55c24b72eea0f65267f231e4ab6a6754'
-RESELLER_MASTER_KEY = 'a7f3e8b2c9d1f4a6b8c2d5e9f1a3b6c8'
 
 # --- NEW RESELLER SERVER CONFIGURATION ---
 NEW_SERVER_API_URL = 'https://rpshivabot-production.up.railway.app'
