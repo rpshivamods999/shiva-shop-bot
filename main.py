@@ -42,7 +42,7 @@ RECEIVER_UPI = '8158833153@fam'
 
 # --- NEW RESELLER SERVER CONFIGURATION ---
 NEW_SERVER_API_URL = 'https://rpshivabot-production.up.railway.app'
-NEW_SERVER_API_KEY = 'bkey_GpUuxoFZ-2drGFwCH_K3Uk_5dSl4k3Z4CflIUcU07Gs'
+NEW_SERVER_API_KEY = 'bkey_dtL7R_Tvx2AviMCKNnNxLXLU-MtY1vQJ4JvWIhkFccI'
 NEW_SERVER_ENABLED_KEY = 'new_server_api_enabled'
 
 # Support Configuration
