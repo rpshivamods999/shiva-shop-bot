@@ -12,8 +12,8 @@ from telebot import types
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # RP SHIVA LIVE SHOP — EXACT CLONE WITH ADMIN DASHBOARD & API SYNC
-TOKEN = os.getenv('BOT_TOKEN', '8802969772:AAGIVPoTPhTNwjXvUzsKHVVXQCVzwpisPIs')
-ADMIN_IDS = [6419247159, 6271161907]  
+TOKEN = os.getenv('BOT_TOKEN', '8802969772:AAEJlruYDsrrlbvLD4yyWMJgDVk37MphqZM')
+ADMIN_IDS = [6419247159]  
 
 RBS_BASE_URL = 'https://rpshivabot-production.up.railway.app/api/v1'
 RBS_BEARER_TOKEN = os.getenv('RBS_BEARER_TOKEN', 'bkey_dtL7R_Tvx2AviMCKNmNxLXLU-MtY1vQJ4JvWIhkFccI')
