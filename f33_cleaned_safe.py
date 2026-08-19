@@ -23,10 +23,10 @@ from aiogram.types import (
 # ==============================================================================
 # 1. BOT CONFIGURATION & CONSTANTS
 # ==============================================================================
-BOT_TOKEN = "YOUR_BOT_TOKEN"
-BOT_USERNAME = "YOUR_BOT_USERNAME"
-ADMIN_ID = 123456789
-ADMIN_CONTACT = "@YOUR_USERNAME"
+BOT_TOKEN = "8774186625:AAEMRho4fj8J_FmJ8bva-_iqYv936z4Xxz0"
+BOT_USERNAME = "@Sagar_ModsShopBot"
+ADMIN_ID = 6419247159
+ADMIN_CONTACT = "@rpshivamods999"
 
 USDT_TO_INR = 90.0
 VIP_DISCOUNT_PERCENTAGE = 15.0
