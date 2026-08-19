@@ -25,7 +25,7 @@ from aiogram.types import (
 # ==============================================================================
 BOT_TOKEN = "8774186625:AAEMRho4fj8J_FmJ8bva-_iqYv936z4Xxz0"
 BOT_USERNAME = "@Sagar_ModsShopBot"
-ADMIN_ID = 6739795427
+ADMIN_ID = 6419247159
 ADMIN_CONTACT = "@rpshivamods999"
 
 USDT_TO_INR = 90.0
