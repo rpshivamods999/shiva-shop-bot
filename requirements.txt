@@ -1,0 +1,7 @@
+aiogram>=3.0.0
+pyTelegramBotAPI
+requests
+qrcode
+Pillow
+opencv-python-headless
+numpy
