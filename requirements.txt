@@ -1,6 +1,7 @@
+aiogram>=3.0.0
 pyTelegramBotAPI
 requests
-qrcode[pil]
+qrcode
 Pillow
 opencv-python-headless
 numpy
