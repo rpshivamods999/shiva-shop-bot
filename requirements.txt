@@ -1,0 +1,6 @@
+pyTelegramBotAPI
+requests
+qrcode[pil]
+Pillow
+opencv-python-headless
+numpy
